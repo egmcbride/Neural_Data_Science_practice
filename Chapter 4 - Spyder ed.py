@@ -43,7 +43,7 @@ matIn = scipy.io.loadmat(r"C:\Users\ethan_000\Documents\GitHub\Neural_Data_Scien
 numTrials = len(matIn['DATA'])
 allOris=[matIn['DATA'][_][0][1][0][0] for _ in range(numTrials)]
 ori = list(set(allOris))
-numOri = len(ori)
+numOris = len(ori)
 trialIndices = defaultdict(list)
 
 # %% 2. & 3. Pruning and Formatting
@@ -54,16 +54,47 @@ for tt in range(numTrials):
     for oo in ori:
         if allOris[tt]==oo:
             trialIndices[oo].append(tt)
-            
-# Step 2: sort spike times into corresponding conditions
 
-numOris = len(ori)
-allOris=[matIn['DATA'][_][0][1][0][0] for _ in range(numTrials)]
-for orind.oo in enumerate(ori):
-    for tt in trialIndices[oo]:
-        for cc in range(numChannels):
-            spikeTimes[tt][orind][cc] = [spike[2] for spike in matIn['DATA'][tt][0][0] 
-            if (spike[0]==cc) and (spike[1] not in noiseCodes)]
-            
-            
-            
+# Step 2: find spike times for all combinations of conditions
+
+# use a dict, which allows dynamic adding of key:value pairs
+# lambda allows another layer of dicts 
+linearizedSpikeTimes = defaultdict(lambda: defaultdict(list))
+for eachtrial in matIn["DATA"]:
+    stimori = eachtrial[0][1][0][0]
+    for eachspike in eachtrial[0][0]:
+        if eachspike[1] not in [0,255]: #not in noiseCodes
+            trode = eachspike[0]
+            spikeTimes = eachspike[2]
+            linearizedSpikeTimes[trode][stimori].append(spikeTimes)
+
+# %% 4a. calculate PSTHs
+   
+#makes histograms of spike rates in each condition
+PSTHs = defaultdict(lambda: defaultdict(list))
+for unitkey in linearizedSpikeTimes.keys():
+    PSTHs[unitkey][0],bins = np.histogram(linearizedSpikeTimes[unitkey][0], bins=timeBase)
+    PSTHs[unitkey][90],bins = np.histogram(linearizedSpikeTimes[unitkey][90], bins=timeBase)
+    
+    
+# %% 5a. data browser 
+
+for unitkey in PSTHs.keys():
+    fig=plt.figure(facecolor='w')
+    for orind,oo in enumerate(ori):
+        ax = fig.add_subplot(2,1,orind+1)
+        ax.plot(timeBase[:-1],PSTHs[unitkey][oo],lw=3,color='b')
+        ax.set_xlim([-.2,2.5])
+        ax.vlines(gratingOn,0,max(PSTHs[unitkey][oo]),color='k',linestyle='--')
+        ax.vlines(gratingOff,0,max(PSTHs[unitkey][oo]),color='k',linestyle='--')
+        ax.set_ylabel('spike count per bin')
+        ax.set_xlabel('time in seconds')
+        ax.set_title('Channel = '+str(int(unitkey))+' Orientation = '+str(oo))
+    plt.tight_layout()
+    plt.show()
+    
+    
+
+# %% SPike count correlations!
+    
+         
