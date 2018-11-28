@@ -95,6 +95,66 @@ for unitkey in PSTHs.keys():
     
     
 
-# %% SPike count correlations!
+# %% Spike count correlations!
     
+# 1. remove bad channels
+    
+livePSTHs = PSTHs #make a copy to make sure we keep our place
+#deadchannels = [21, 31, 34, 56, 68] #real bad channels
+deadchannels = [21,31,34,56,68, 7,16,32,37,39,41,43,45,47,48,51,52,54,94,95] #dead and noisy channels
+[livePSTHs.pop(dead, None) for dead in deadchannels ]
+numChanLeft = len(livePSTHs)
          
+
+# 2. Calculating the correlations
+
+rSC = np.zeros(shape=(len(livePSTHs),len(livePSTHs), len(ori))) #preallocate
+for rowind,rowkey in enumerate(livePSTHs.keys()): #loop over rows (units)
+    for colind,colkey in enumerate(livePSTHs.keys()): #loop over columns (same units)
+        for orind,oo in enumerate(ori): #loop over orientations
+            rSC[rowind,colind,orind],dummy = sc.pearsonr(livePSTHs[rowkey][oo][11:211], 
+               livePSTHs[colkey][oo][11:211]) #noise correlation ONLY OVER STIM (11:211))
+globalMean = np.mean(rSC)
+
+
+# %% Plot correlations
+
+#important for resizing colorbar!!
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+plt.set_cmap('jet')
+
+fig=plt.figure(facecolor='w')
+for orind,oo in enumerate(ori):
+    ax = fig.add_subplot(1,numOris,orind+1)
+    img=ax.imshow(rSC[:,:,orind])
+#    ax.axis('equal')
+    
+    # create an axes on the right side of ax. The width of cax will be 5%
+    # of ax and the padding between cax and ax will be fixed at 0.05 inch.
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+
+    plt.colorbar(img, cax=cax)
+
+    ax.set_title('Orientation: '+str(oo)+'\xb0')
+plt.tight_layout()
+plt.show()
+
+
+""" 
+Keep in mind convolution!
+Convolution is just a moving average
+Most often done on bin widths of 1ms with a gaussian kernel
+
+Technically it is:
+    multiplication of each value in a time series with a corresponding value
+    in a "kernel" that slides across the time series, then summing up all of
+    these products to yield a new value (often divided by the sum of all 
+    numbers in the kernel to get an average, instead of a sum)
+    
+    Convolution is "zero-padded", so that values at the edges are multiplied by zero and fall off
+    This results in a n+(k-1) elements output
+    "valid" results are shorter, n-(k-1)
+    use odd-numbered kernels, so that they do not phase shift (even kernels phase shift)
+    
